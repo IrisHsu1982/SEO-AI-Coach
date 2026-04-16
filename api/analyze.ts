@@ -1,20 +1,21 @@
 import { GoogleGenAI } from "@google/genai";
 
-export const config = {
-  runtime: 'edge',
-};
+export default async function handler(req, res) {
+  // 增加日誌，方便在 Vercel Logs 查看
+  console.log("API 收到請求，方法:", req.method);
 
-export default async function handler(req: Request) {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { content, mainKeyword } = await req.json();
+    const { content, mainKeyword } = req.body;
+    console.log("正在分析關鍵字:", mainKeyword);
     
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'API Key not configured' }), { status: 500 });
+      console.error("錯誤: 找不到 GEMINI_API_KEY 環境變數");
+      return res.status(500).json({ error: 'API Key 未設定，請檢查 Vercel 環境變數' });
     }
 
     const genAI = new GoogleGenAI(apiKey);
@@ -50,11 +51,10 @@ export default async function handler(req: Request) {
     const response = await result.response;
     const text = response.text();
     
-    return new Response(text, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.log("AI 分析完成");
+    res.status(200).json(JSON.parse(text));
   } catch (error) {
-    console.error("Analysis Error:", error);
-    return new Response(JSON.stringify({ error: '分析失敗' }), { status: 500 });
+    console.error("API 執行錯誤:", error);
+    res.status(500).json({ error: '分析失敗: ' + (error instanceof Error ? error.message : '未知錯誤') });
   }
 }
